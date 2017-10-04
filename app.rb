@@ -1,10 +1,10 @@
 require 'net/http'
 require 'uri'
-
+require './env' if File.exists?('env.rb')
 
 uri = URI.parse("https://api.intercom.io/conversations")
 request = Net::HTTP::Get.new(uri)
-request["Authorization"] = "Bearer YOUR KEY"
+request["Authorization"] = "Bearer #{ENV['access_token']}"
 request["Accept"] = "application/json"
 
 req_options = {
