@@ -32,15 +32,42 @@ parsed_convo_list['conversations'].each do |convo|
   convo_ids << convo['id'].to_i
 end
 
-convo_ids
-
 # all_convos needs to be an array of conversation id's that we got from the call above 👆
 
-def get_single_convos(all_convos)
-	all_convos.each do |id|
+def get_single_convos(convo_ids)
+	convo_ids.each do |id|
 	  single_convo = @intercom.conversations.find(id: id)
-	  p single_convo.admin
+	  # p single_convo.conversation_parts
+    parse_convo_to_parts(single_convo)
   end
 end
 
+def parse_convo_to_parts(single_convo)
+  p "🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷"
+  p "CONVO STARTED AT #{single_convo.created_at}"
+  first_message = single_convo.conversation_message
+  p single_convo.created_at
+  p first_message.body
+  p first_message.author
+  single_convo.conversation_parts.each do |part|
+    parse_convo_part(part)
+  end
+  if single_convo.conversation_parts.last
+    p "CONVO ENDED AT #{single_convo.conversation_parts.last.created_at}"
+    p "🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄"
+  end
+end
+
+def parse_convo_part(convo_part)
+  p "CONVO PART"
+  p created_at = convo_part.created_at
+  p body = convo_part.body if convo_part.body
+  p author = convo_part.author.id
+end
+
+
+# parse_convo_to_parts(@intercom.conversations.find(id: 12140987705))
+
+
 get_single_convos(convo_ids)
+# parse_convo_to_parts(get_single_convos(convo_ids))
