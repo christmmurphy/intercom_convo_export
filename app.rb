@@ -39,6 +39,7 @@ def get_single_convos(convo_ids)
 	  single_convo = @intercom.conversations.find(id: id)
 	  # p single_convo.conversation_parts
     parse_convo_to_parts(single_convo)
+    rate_limiter
   end
 end
 
@@ -63,6 +64,16 @@ def parse_convo_part(convo_part)
   p created_at = convo_part.created_at
   p body = convo_part.body if convo_part.body
   p author = convo_part.author.id
+end
+
+def rate_limiter
+  @remaining = @intercom.rate_limit_details[:remaining]
+  @threshold = 30
+  @sleep_time = 10
+  #Check the remaining limit against the threshold
+  if @remaining <= @threshold
+    sleep(@sleep_time)
+  end
 end
 
 
