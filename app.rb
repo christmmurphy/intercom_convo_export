@@ -48,7 +48,7 @@ def parse_convo_to_parts(single_convo)
   first_message = single_convo.conversation_message
   p single_convo.created_at
   p first_message.body
-  p first_message.author
+  find_author(first_message.author)
   single_convo.conversation_parts.each do |part|
     parse_convo_part(part)
   end
@@ -71,16 +71,34 @@ end
 def find_author(author)
   author_type = author.class
   if author_type == Intercom::Admin
+    author_type = "Admin"
     found_author = @intercom.admins.find(id: author.id)
     name = found_author.name
   elsif author_type == Intercom::User
+    author_type = "User"
     found_author = @intercom.users.find(id: author.id)
     name = found_author.name
+  elsif author_type == Intercom::Lead
+    author_type = "Lead"
+    found_author = @intercom.contacts.find(id: author.id)
+    lead_identifier(found_author)
   else
-    found_author = author
+    author_type = "Bot"
+    found_author = "Operator"
   end
+  p author_type
   p found_author if name.nil?
   p name unless name.nil?
+end
+
+def lead_identifier(lead_author)
+  if lead_author.email
+    name = "Email: #{lead_author.email}"
+  elsif lead_author.name
+    name = "Name: #{lead_author.name}"
+  else
+    name = lead_author.pseudonym
+  end
 end
 
 def rate_limiter
@@ -92,10 +110,6 @@ def rate_limiter
     sleep(@sleep_time)
   end
 end
-
-
-# parse_convo_to_parts(@intercom.conversations.find(id: 12140987705))
-
 
 get_single_convos(convo_ids)
 # parse_convo_to_parts(get_single_convos(convo_ids))
