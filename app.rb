@@ -36,8 +36,7 @@ end
 
 def get_single_convos(convo_ids)
 	convo_ids.each do |id|
-	  single_convo = @intercom.conversations.find(id: id)
-	  # p single_convo.conversation_parts
+	 single_convo = @intercom.conversations.find(id: id)
     parse_convo_to_parts(single_convo)
     rate_limiter
   end
@@ -62,8 +61,25 @@ end
 def parse_convo_part(convo_part)
   p "CONVO PART"
   p created_at = convo_part.created_at
-  p body = convo_part.body if convo_part.body
-  p author = convo_part.author.id
+  p body = convo_part.body unless convo_part.body.nil?
+  author = convo_part.author
+  find_author(author)
+  p attachment = convo_part.attachments unless convo_part.attachments.empty?
+end
+
+def find_author(author)
+  author_type = author.class
+  if author_type == Intercom::Admin
+    found_author = @intercom.admins.find(id: author.id)
+    name = found_author.name
+  elsif author_type == Intercom::User
+    found_author = @intercom.users.find(id: author.id)
+    name = found_author.name
+  else
+    found_author = author
+  end
+  p found_author if name.nil?
+  p name unless name.nil?
 end
 
 def rate_limiter
