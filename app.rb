@@ -61,7 +61,8 @@ end
 def parse_convo_part(convo_part)
   p "CONVO PART"
   p created_at = convo_part.created_at
-  p body = convo_part.body unless convo_part.body.nil?
+  body = convo_part.body
+  p body.gsub(/<\/?[^>]*>/, "") unless body.nil?
   author = convo_part.author
   find_author(author)
   p attachment = convo_part.attachments unless convo_part.attachments.empty?
