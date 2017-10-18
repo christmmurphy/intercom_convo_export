@@ -83,20 +83,32 @@ def parse_convo_part(convo_part)
   p attachment = convo_part.attachments unless convo_part.attachments.empty?
 end
 
+def find_author_for_admin(id)
+  @intercom.admins.find(id: author.id).name
+rescue => e
+  puts "there was an ADMIN.author error #{e.message}"
+end
+
+def find_author_for_user(id)
+  @intercom.users.find(id: author.id).name
+rescue => e
+  puts "there was an USER.author error #{e.message}"
+end
+
+def find_author_for_lead(id)
+  @intercom.contacts.find(id: author.id).name
+rescue => e
+  puts "there was a LEAD.author error #{e.message}"
+end
+
 def find_author(author)
-  author_type = author.class
-  if author_type == Intercom::Admin
-    author_type = "Admin"
-    found_author = @intercom.admins.find(id: author.id)
-    name = found_author.name
-  elsif author_type == Intercom::User
-    author_type = "User"
-    found_author = @intercom.users.find(id: author.id)
-    name = found_author.name
-  elsif author_type == Intercom::Lead
-    author_type = "Lead"
-    found_author = @intercom.contacts.find(id: author.id)
-    lead_identifier(found_author)
+  case
+  when author.class == Intercom::Admin
+    name = find_author_for_admin(author.id)
+  when author.class == Intercom::User
+    name = find_author_for_user(author.id)
+  when author.class == Intercom::Lead
+    name = find_author_for_lead(author.id)
   else
     author_type = "Bot"
     found_author = "Operator"
@@ -105,6 +117,24 @@ def find_author(author)
   p found_author if name.nil?
   p name unless name.nil?
 end
+
+# Old stuff below here! :)
+# if author_type == Intercom::Admin
+#   author_type = "Admin"
+#   found_author = @intercom.admins.find(id: author.id)
+#   name = found_author.name
+# elsif author_type == Intercom::User
+#   author_type = "User"
+#   found_author = @intercom.users.find(id: author.id)
+#   name = found_author.name
+# elsif author_type == Intercom::Lead
+#   author_type = "Lead"
+#   found_author = @intercom.contacts.find(id: author.id)
+#   lead_identifier(found_author)
+# else
+#   author_type = "Bot"
+#   found_author = "Operator"
+# end
 
 def lead_identifier(lead_author)
   if lead_author.email
