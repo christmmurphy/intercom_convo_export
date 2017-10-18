@@ -78,44 +78,37 @@ def parse_convo_part(convo_part)
   p created_at = convo_part.created_at
   body = convo_part.body
   p body.gsub(/<\/?[^>]*>/, "") unless body.nil?
-  author = convo_part.author
-  find_author(author)
+  author = find_author(convo_part.author)
+  p "name: #{author[:name]} type: #{author[:type]}"
   p attachment = convo_part.attachments unless convo_part.attachments.empty?
 end
 
 def find_author_for_admin(id)
-  @intercom.admins.find(id: author.id).name
+  { name: @intercom.admins.find(id: author.id).name, type: "admin" }
 rescue => e
   puts "there was an ADMIN.author error #{e.message}"
+  {}
 end
 
 def find_author_for_user(id)
-  @intercom.users.find(id: author.id).name
+  { name: @intercom.users.find(id: author.id).name, type: "user" }
 rescue => e
   puts "there was an USER.author error #{e.message}"
+  {}
 end
 
 def find_author_for_lead(id)
-  @intercom.contacts.find(id: author.id).name
+  { name: @intercom.contacts.find(id: author.id).name, type: "lead" }
 rescue => e
   puts "there was a LEAD.author error #{e.message}"
+  {}
 end
 
 def find_author(author)
-  case
-  when author.class == Intercom::Admin
-    name = find_author_for_admin(author.id)
-  when author.class == Intercom::User
-    name = find_author_for_user(author.id)
-  when author.class == Intercom::Lead
-    name = find_author_for_lead(author.id)
-  else
-    author_type = "Bot"
-    found_author = "Operator"
-  end
-  p author_type
-  p found_author if name.nil?
-  p name unless name.nil?
+  return find_author_for_admin(author.id) if author.class == Intercom::Admin
+  return find_author_for_user(author.id) if author.class == Intercom::User
+  return find_author_for_lead(author.id) if author.class == Intercom::Lead
+  { name: "Operator", type: "Bot" }
 end
 
 # Old stuff below here! :)
