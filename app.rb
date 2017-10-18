@@ -4,8 +4,23 @@ require './env' if File.exists?('env.rb')
 require 'json'
 require 'intercom'
 
+# create a .txt file to write to
+export_start = Time.now.utc
+File.open("export.txt", "w") {|f| f.write("Conversation Export: #{export_start}\n\n") }
+p "Export Started At: #{export_start} \n"
+
+# method to write to the export file
+def write_to_export(content)
+    content = content.to_s
+    File.open("export.txt", 'a+') do |f|
+      f.puts(content + "\n")
+    end
+end
+
+#set up Intercom client for ruby requests
 @intercom = Intercom::Client.new(token: ENV['access_token'])
 
+#set up CURL client for grabbing conversations
 uri = URI.parse("https://api.intercom.io/conversations")
 request = Net::HTTP::Get.new(uri)
 request["Authorization"] = "Bearer #{ENV['access_token']}"
