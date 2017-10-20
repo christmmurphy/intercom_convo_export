@@ -1,162 +1,145 @@
 require 'net/http'
 require 'uri'
-require './env' if File.exists?('env.rb')
 require 'json'
 require 'intercom'
 
-# create a .txt file to write to
-export_start = Time.now.utc
-File.open("export.txt", "w") {|f| f.write("Conversation Export: #{export_start}\n\n") }
-p "Export Started At: #{export_start} \n"
+class ConversationsParser
+  attr_reader :file_name, :token, :intercom
 
-# method to write to the export file
-def write_to_export(content)
-    content = content.to_s
-    File.open("export.txt", 'a+') do |f|
-      f.puts(content + "\n")
+  def initialize(file_name, token)
+    @file_name = file_name
+    @intercom = Intercom::Client.new(token: token)
+
+    File.write(file_name, "")
+  end
+
+  def write_to_file_and_print(content)
+    puts content
+    File.open(file_name, 'a+') { |f| f.puts(content.to_s + "\n") }
+  end
+
+  def find_author(author)
+    if author.class == Intercom::Admin
+      { name: intercom.admins.find(id: author.id).name, type: "admin" }
+    elsif author.class == Intercom::User
+      { name: intercom.users.find(id: author.id).name, type: "user" }
+    elsif author.class == Intercom::Lead
+      { name: intercom.contacts.find(id: author.id).name, type: "lead" }
+    else
+      { name: "Operator", type: "Bot" }
     end
-end
+  rescue Intercom::AttributeNotSetError
+    { name: nil, type: nil }
+  end
 
-#set up Intercom client for ruby requests
-@intercom = Intercom::Client.new(token: ENV['access_token'])
+  def parse_conversation_parts(conversation)
+    write_to_file_and_print("CONVERSATION: #{conversation.id} STARTED AT #{conversation.created_at}")
+    first_message = conversation.conversation_message
 
-#set up CURL client for grabbing conversations
-uri = URI.parse("https://api.intercom.io/conversations")
-request = Net::HTTP::Get.new(uri)
-request["Authorization"] = "Bearer #{ENV['access_token']}"
-request["Accept"] = "application/json"
+    write_to_file_and_print(first_message.body)
 
-req_options = {
-  use_ssl: uri.scheme == "https",
-}
+    author = with_rate_limit { find_author(first_message.author) }
+    write_to_file_and_print("name:\n#{author[:name]}\ntype:\n#{author[:type]}")
 
-response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
-  http.request(request)
-end
+    conversation.conversation_parts.each do |part|
+      parse_conversation_part(part)
+    end
+  end
 
+  def parse_conversation_part(conversation_part)
+    write_to_file_and_print("CONVO PART")
+    write_to_file_and_print("created_at: #{conversation_part.created_at}")
 
-# response.code
-response.body
+    body = conversation_part.body.to_s.gsub(/<\/?[^>]*>/, "")
 
-# parsing the JSON response from a list of conversations
-parsed_convo_list = JSON.parse(response.body)
+    write_to_file_and_print("body:\n#{body}")
 
-convo_ids= []
+    author = with_rate_limit { find_author(conversation_part.author) }
+    write_to_file_and_print("name:\n#{author[:name]}\ntype:\n#{author[:type]}")
 
-parsed_convo_list['conversations'].each do |convo|
-  convo_ids << convo['id'].to_i
-end
+    write_to_file_and_print("attachments:\n#{conversation_part.attachments.to_s}")
+  end
 
-# all_convos needs to be an array of conversation id's that we got from the call above 👆
+  def with_rate_limit
+    value = yield
 
-def get_single_convos(convo_ids)
-	convo_ids.each do |id|
-	 single_convo = @intercom.conversations.find(id: id)
-    parse_convo_to_parts(single_convo)
-    rate_limiter
+    sleep 10 if intercom.rate_limit_details[:remaining] <= 30
+
+    value
+  end
+
+  def get_single_conversation(id)
+    with_rate_limit do
+      intercom.conversations.find(id: id)
+    end
+  end
+
+  def parse(id)
+    conversation = get_single_conversation(id)
+    parse_conversation_parts(conversation)
   end
 end
 
-def parse_convo_to_parts(single_convo)
-  p "🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷"
-  p "CONVO STARTED AT #{single_convo.created_at}"
-  write_to_export("CONVO STARTED AT #{single_convo.created_at}")
-  first_message = single_convo.conversation_message
-  p single_convo.created_at
-  write_to_export(single_convo.created_at)
-  p first_message.body
-  write_to_export(first_message.body)
-  find_author(first_message.author)
-  single_convo.conversation_parts.each do |part|
-    parse_convo_part(part)
+class IntercomConversationsExporter
+  attr_reader :token, :conversations_parser
+
+  def initialize(file_name)
+    @token = ENV["INTERCOM_TOKEN"]
+    @conversations_parser = ConversationsParser.new(file_name, token)
   end
-  if single_convo.conversation_parts.last
-    p "CONVO ENDED AT #{single_convo.conversation_parts.last.created_at}"
-    p "🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄"
-    write_to_export("CONVO ENDED AT #{single_convo.conversation_parts.last.created_at}")
-    write_to_export("-------------------------------------")
+
+  def get_intercom_conversations_number_of_pages(token)
+    uri = URI.parse("https://api.intercom.io/conversations")
+    request = Net::HTTP::Get.new(uri)
+    request["Authorization"] = "Bearer #{token}"
+    request["Accept"] = "application/json"
+
+    req_options = {
+      use_ssl: uri.scheme == "https",
+    }
+
+    response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
+      http.request(request)
+    end
+
+    JSON.parse(response.body)["pages"]["total_pages"]
   end
-end
 
-def parse_convo_part(convo_part)
-  p "CONVO PART"
-  p created_at = convo_part.created_at
-  write_to_export(created_at = convo_part.created_at)
-  body = convo_part.body
-  p body.gsub(/<\/?[^>]*>/, "") unless body.nil?
-  write_to_export(body.gsub(/<\/?[^>]*>/, "")) unless body.nil?
-  author = find_author(convo_part.author)
-  p "name: #{author[:name]} type: #{author[:type]}"
-  write_to_export("name: #{author[:name]} type: #{author[:type]}")
-  p attachment = convo_part.attachments unless convo_part.attachments.empty?
-  write_to_export(attachment = convo_part.attachments) unless convo_part.attachments.empty?
-end
+  def get_intercom_conversations_page(number, token)
+    uri = URI.parse("https://api.intercom.io/conversations?per_page=20&page=#{number}")
+    request = Net::HTTP::Get.new(uri)
+    request["Authorization"] = "Bearer #{token}"
+    request["Accept"] = "application/json"
 
-def find_author_for_admin(id)
-  { name: @intercom.admins.find(id: author.id).name, type: "admin" }
-rescue => e
-  puts "there was an ADMIN.author error #{e.message}"
-  {}
-end
+    req_options = {
+      use_ssl: uri.scheme == "https",
+    }
 
-def find_author_for_user(id)
-  { name: @intercom.users.find(id: author.id).name, type: "user" }
-rescue => e
-  puts "there was an USER.author error #{e.message}"
-  {}
-end
+    response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
+      http.request(request)
+    end
 
-def find_author_for_lead(id)
-  { name: @intercom.contacts.find(id: author.id).name, type: "lead" }
-rescue => e
-  puts "there was a LEAD.author error #{e.message}"
-  {}
-end
+    JSON.parse(response.body)
+  end
 
-def find_author(author)
-  return find_author_for_admin(author.id) if author.class == Intercom::Admin
-  return find_author_for_user(author.id) if author.class == Intercom::User
-  return find_author_for_lead(author.id) if author.class == Intercom::Lead
-  { name: "Operator", type: "Bot" }
-end
 
-# Old stuff below here! :)
-# if author_type == Intercom::Admin
-#   author_type = "Admin"
-#   found_author = @intercom.admins.find(id: author.id)
-#   name = found_author.name
-# elsif author_type == Intercom::User
-#   author_type = "User"
-#   found_author = @intercom.users.find(id: author.id)
-#   name = found_author.name
-# elsif author_type == Intercom::Lead
-#   author_type = "Lead"
-#   found_author = @intercom.contacts.find(id: author.id)
-#   lead_identifier(found_author)
-# else
-#   author_type = "Bot"
-#   found_author = "Operator"
-# end
+  def process_conversations(conversations)
+    conversations.each do |conversation|
+      conversations_parser.parse(conversation["id"])
+    end
+  end
 
-def lead_identifier(lead_author)
-  if lead_author.email
-    name = "Email: #{lead_author.email}"
-  elsif lead_author.name
-    name = "Name: #{lead_author.name}"
-  else
-    name = lead_author.pseudonym
+  def run
+    pages = get_intercom_conversations_number_of_pages(token)
+    page = 1
+
+    until page == pages
+      conversations_page = get_intercom_conversations_page(page, token)
+      process_conversations(conversations_page["conversations"])
+
+      page = conversations_page["pages"]["page"]
+    end
   end
 end
 
-def rate_limiter
-  @remaining = @intercom.rate_limit_details[:remaining]
-  @threshold = 30
-  @sleep_time = 10
-  #Check the remaining limit against the threshold
-  if @remaining <= @threshold
-    sleep(@sleep_time)
-  end
-end
-
-get_single_convos(convo_ids)
-# parse_convo_to_parts(get_single_convos(convo_ids))
+IntercomConversationsExporter.new("export.txt").run
