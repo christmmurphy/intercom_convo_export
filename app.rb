@@ -60,9 +60,12 @@ end
 def parse_convo_to_parts(single_convo)
   p "🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷🎷"
   p "CONVO STARTED AT #{single_convo.created_at}"
+  write_to_export("CONVO STARTED AT #{single_convo.created_at}")
   first_message = single_convo.conversation_message
   p single_convo.created_at
+  write_to_export(single_convo.created_at)
   p first_message.body
+  write_to_export(first_message.body)
   find_author(first_message.author)
   single_convo.conversation_parts.each do |part|
     parse_convo_part(part)
@@ -70,17 +73,23 @@ def parse_convo_to_parts(single_convo)
   if single_convo.conversation_parts.last
     p "CONVO ENDED AT #{single_convo.conversation_parts.last.created_at}"
     p "🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄🏄"
+    write_to_export("CONVO ENDED AT #{single_convo.conversation_parts.last.created_at}")
+    write_to_export("-------------------------------------")
   end
 end
 
 def parse_convo_part(convo_part)
   p "CONVO PART"
   p created_at = convo_part.created_at
+  write_to_export(created_at = convo_part.created_at)
   body = convo_part.body
   p body.gsub(/<\/?[^>]*>/, "") unless body.nil?
+  write_to_export(body.gsub(/<\/?[^>]*>/, "")) unless body.nil?
   author = find_author(convo_part.author)
   p "name: #{author[:name]} type: #{author[:type]}"
+  write_to_export("name: #{author[:name]} type: #{author[:type]}")
   p attachment = convo_part.attachments unless convo_part.attachments.empty?
+  write_to_export(attachment = convo_part.attachments) unless convo_part.attachments.empty?
 end
 
 def find_author_for_admin(id)
