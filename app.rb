@@ -28,7 +28,7 @@ class ConversationsParser
     else
       { name: "Operator", type: "Bot" }
     end
-  rescue Intercom::AttributeNotSetError
+  rescue Intercom::AttributeNotSetError, Intercom::ResourceNotFound
     { name: nil, type: nil }
   end
 
