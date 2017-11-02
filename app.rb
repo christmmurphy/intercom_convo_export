@@ -81,11 +81,10 @@ class ConversationsParser
 end
 
 class IntercomConversationsExporter
-  attr_reader :token, :conversations_parser
+  attr_reader :token
 
-  def initialize(file_name)
+  def initialize
     @token = ENV["INTERCOM_TOKEN"]
-    @conversations_parser = ConversationsParser.new(file_name, token)
   end
 
   def get_intercom_conversations_number_of_pages(token)
@@ -123,23 +122,39 @@ class IntercomConversationsExporter
   end
 
 
-  def process_conversations(conversations)
+  def process_conversations(file_name, conversations)
     conversations.each do |conversation|
-      conversations_parser.parse(conversation["id"])
+      ConversationsParser.new(file_name, token).parse(conversation["id"])
     end
   end
 
-  def run
+  def download(page)
     pages = get_intercom_conversations_number_of_pages(token)
-    page = 1
-
     until page == pages
       conversations_page = get_intercom_conversations_page(page, token)
-      process_conversations(conversations_page["conversations"])
-
+      
+      puts "downloading page: #{page}"
+      File.write("convo_exporter_#{page}.json", conversations_page["conversations"].to_json)
       page = conversations_page["pages"]["page"]
+    end
+  end
+
+  def parse(page)
+    Dir.glob("convo_exporter_*").each do |name|
+      f_page = name.split('_').last.split('.').first.to_i
+      next if f_page < page
+      
+      puts "parsing page: #{page}"
+      convo = JSON.parse(File.read("convo_exporter_#{page}.json"))
+      process_conversations("convo_exporter_parsed_#{page}.txt", convo)
     end
   end
 end
 
-IntercomConversationsExporter.new("export.txt").run
+command = ARGV[0]
+opt = ARGV[2].to_i
+IntercomConversationsExporter.new.download(opt) if command == "download"
+IntercomConversationsExporter.new.parse(opt) if command == "parse"
+
+# ruby app.rb download 1
+# ruby app.rb parse 1
